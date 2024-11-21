@@ -87,7 +87,7 @@ class VacancyParser:
                                 "description": "brief description of responsibilities (max 300 chars)",
                                 "contacts": {{
                                     "type": "telegram_username/phone/link/email",
-                                    "value": "actual contact value"
+                                    "value": "actual contact value without @ for telegram usernames"
                                 }}
                             }}
 
