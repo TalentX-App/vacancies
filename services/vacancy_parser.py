@@ -139,7 +139,7 @@ class VacancyParser:
                 max_salary = 0
 
             # Обработка компании: если её нет, подставляем "Не указано"
-            company = parsed.get('company', 'Не указано')
+            company = parsed.get('company') or 'Не указано'
 
             return VacancyData(
                 title=parsed['title'],
@@ -151,7 +151,7 @@ class VacancyParser:
                     "range": {"min": min_salary, "max": max_salary}
                 },
                 location=parsed['location'],
-                company=company,
+                company=company,  # всегда строка, либо значение по умолчанию
                 description=parsed['description'],
                 contacts=parsed['contacts'],
                 raw_text=message.text
