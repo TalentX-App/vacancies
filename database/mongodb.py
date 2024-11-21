@@ -12,12 +12,12 @@ class Database:
     async def connect_to_database(self):
         self.client = AsyncIOMotorClient(settings.mongodb_url)
         self.db = self.client[settings.database_name]
-        print("Connected to MongoDB!")
+        print("Подключились к MongoDB!")
 
     async def close_database_connection(self):
         if self.client is not None:
             self.client.close()
-            print("Closed MongoDB connection!")
+            print("Соединение с MongoDB закрыто!")
 
 
 db = Database()

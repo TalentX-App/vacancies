@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router as api_router
 from config import get_settings
 from database.mongodb import db
-from services.telegram_parser import create_telegram_parser
+from services.vacancy_parser import VacancyParser
 
 settings = get_settings()
 
@@ -16,15 +16,21 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Startup
     await db.connect_to_database()
-    parser = create_telegram_parser(settings)
-    parsing_task = asyncio.create_task(parser.start_periodic_parsing())
+
+    # Initialize parser
+    parser = VacancyParser(api_key=settings.anthropic_api_key)
+
     yield
+
     # Shutdown
-    await parser.stop_parsing()
-    await parsing_task
     await db.close_database_connection()
 
-app = FastAPI(title="Telegram Jobs Parser API", lifespan=lifespan)
+app = FastAPI(
+    title="Job Vacancies API",
+    description="API for parsing and serving job vacancies",
+    version="2.0",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
