@@ -1,13 +1,23 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
+
+class SalaryRange(BaseModel):
+    min: int
+    max: int
 
 
 class SalaryInfo(BaseModel):
     amount: str
-    currency: Optional[str] = None
-    range: Optional[Dict[str, str]] = None
+    currency: str
+    range: SalaryRange
+
+
+class ContactInfo(BaseModel):
+    type: str
+    value: str
 
 
 class VacancyBase(BaseModel):
@@ -16,7 +26,9 @@ class VacancyBase(BaseModel):
     work_format: str
     salary: SalaryInfo
     location: str
+    company: str
     description: str
+    contacts: ContactInfo
     raw_text: str
     telegram_message_id: Optional[int] = None
     channel_id: Optional[str] = None
@@ -24,17 +36,9 @@ class VacancyBase(BaseModel):
 
 
 class VacancyResponse(VacancyBase):
-    id: str
+    id: str  # Include the id to map to MongoDB's _id
 
 
 class VacancyList(BaseModel):
-    vacancies: List[VacancyResponse]
+    vacancies: list[VacancyResponse]
     total: int
-
-
-class VacancyFilter(BaseModel):
-    search: Optional[str] = None
-    work_format: Optional[str] = None
-    location: Optional[str] = None
-    salary_min: Optional[str] = None
-    salary_max: Optional[str] = None

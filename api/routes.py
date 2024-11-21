@@ -90,19 +90,25 @@ async def get_vacancies(
 ):
     query = {}
 
+    # Apply search filter
     if search:
         query["$or"] = [
             {"title": {"$regex": search, "$options": "i"}},
             {"description": {"$regex": search, "$options": "i"}}
         ]
 
+    # Filter by work format
     if work_format:
         query["work_format"] = {"$regex": work_format, "$options": "i"}
 
+    # Filter by location
     if location:
         query["location"] = {"$regex": location, "$options": "i"}
 
+    # Get total count of documents matching query
     total = await db.db.vacancies.count_documents(query)
+
+    # Retrieve vacancies with pagination and sorting
     cursor = db.db.vacancies.find(query)\
         .skip(skip)\
         .limit(limit)\
@@ -118,9 +124,12 @@ async def get_vacancies(
             doc["salary"]["range"]["max"] = str(
                 doc["salary"]["range"].get("max"))
 
+        # Convert MongoDB ObjectId to string for the response
         doc["id"] = str(doc["_id"])
         del doc["_id"]
+
         try:
+            # Create a VacancyResponse from the document data
             vacancies.append(VacancyResponse(**doc))
         except Exception as e:
             print(f"Error creating VacancyResponse: {e}")
