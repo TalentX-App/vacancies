@@ -60,28 +60,17 @@ class AnthropicParser(AIParser):
     async def parse_text(self, text: str) -> Optional[dict]:
         try:
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",  # Используем более экономичную модель
-                max_tokens=1000,  # Уменьшаем максимальное количество токенов
+                model="claude-3-haiku-20240307",
+                max_tokens=1000,
                 temperature=0.1,
                 system="You are a specialized job vacancy parser for Ukrainian language. Extract and return only valid JSON with key fields.",
                 messages=[{
                     "role": "user",
-                    "content": f"""Parse this job vacancy text efficiently and return a minimal JSON with key fields:
-                    {{
-                        "title": "job title",
-                        "salary": "salary or null",
-                        "location": {{
-                            "cities": ["city names"],
-                            "is_remote": boolean
-                        }},
-                        "company": "company name or null",
-                        "requirements": ["main requirements"],
-                        "conditions": ["main conditions"],
-                        "contact": "contact info"
-                    }}
-
-                    Text: {text}
-                    """
+                    "content": f"Parse this job vacancy text efficiently and return a minimal JSON with key fields: " +
+                    '{"title": "job title", "salary": "salary or null", ' +
+                    '"location": {"cities": ["city names"], "is_remote": boolean}, ' +
+                    '"company": "company name or null", "requirements": ["main requirements"], ' +
+                    '"conditions": ["main conditions"], "contact": "contact info"} Text: {text}'
                 }]
             )
 
@@ -112,7 +101,7 @@ class MongoDBService(DatabaseService):
             await self.db.vacancies.insert_one(vacancy.dict())
             return True
         except Exception as e:
-            print(f"Error saving vacancy: {e}")
+            print(f"Error saving vacancy: {str(e)}")
             return False
 
     async def vacancy_exists(self, message_id: int, channel_id: str) -> bool:
@@ -133,7 +122,6 @@ class VacancyMessageParser(MessageParser):
         """Format contact information to Telegram URL"""
         if not contact:
             return None
-
         contact = contact.strip()
         if contact.startswith('@'):
             return f"https://t.me/{contact[1:]}"
@@ -143,18 +131,10 @@ class VacancyMessageParser(MessageParser):
 
     def _is_vacancy_message(self, text: str) -> bool:
         """Check if message looks like a vacancy"""
-        # Ключевые индикаторы вакансии
         vacancy_indicators = [
-            "ЗП:",
-            "Зарплата:",
-            "Умови:",
-            "Вимоги:",
-            "Компанія:",
-            "Обов'язки:",
-            "Контакти:"
+            "ЗП:", "Зарплата:", "Умови:", "Вимоги:",
+            "Компанія:", "Обов'язки:", "Контакти:"
         ]
-
-        # Проверяем наличие минимум 3 индикаторов
         matches = sum(
             1 for indicator in vacancy_indicators if indicator in text)
         return matches >= 3
@@ -164,7 +144,6 @@ class VacancyMessageParser(MessageParser):
         if not message.text:
             return None
 
-        # Проверяем, похоже ли сообщение на вакансию
         if not self._is_vacancy_message(message.text):
             print(
                 f"Message {message.id} doesn't look like a vacancy, skipping...")
@@ -173,10 +152,9 @@ class VacancyMessageParser(MessageParser):
         try:
             parsed_data = await self.ai_parser.parse_text(message.text)
             if not parsed_data or not parsed_data.get('title'):
-                print(f"Failed to parse {message.id}")
+                print(f"Failed to parse message {message.id}")
                 return None
 
-            # Create Location object
             location = Location(
                 cities=parsed_data.get('location', {}).get(
                     'cities', ['Not specified']),
@@ -185,7 +163,6 @@ class VacancyMessageParser(MessageParser):
                 details=parsed_data.get('location', {}).get('details')
             )
 
-            # Create Vacancy with additional fields
             return Vacancy(
                 title=parsed_data.get('title'),
                 salary=parsed_data.get('salary'),
@@ -255,14 +232,12 @@ class TelegramParser:
                     await self.fetch_and_save_messages(channel, limit=50)
                     total_processed += 1
                 except Exception as e:
-                    print(f"Error processing channel {channel}: {e}")
+                    print(f"Error processing channel {channel}: {str(e)}")
 
-                # Rate limiting delay between channels
-                await asyncio.sleep(5)
+                await asyncio.sleep(5)  # Rate limiting delay
 
-            print(f"Completed  {total_processed} channels.")
-            # Wait before next round (5 minutes)
-            await asyncio.sleep(300)
+            print(f"Completed parsing. Processed {total_processed} channels.")
+            await asyncio.sleep(300)  # Wait 5 minutes before next round
 
     async def stop_parsing(self):
         """Stop the parsing process"""
@@ -274,65 +249,59 @@ class TelegramParser:
         await self.start_client()
 
         try:
-            # Handle numeric channel IDs
             if channel_id.startswith('-100'):
                 peer = int(channel_id)
             else:
                 try:
                     peer = int(channel_id)
-                    # Add -100 prefix for supergroup/channel IDs
                     peer = int(f"-100{str(peer).replace('-100', '')}")
                 except ValueError:
-                    # If not numeric, treat as username
                     peer = channel_id
 
             try:
                 channel_entity = await self.client.get_entity(peer)
                 print(f"Successfully got entity for channel: {channel_id}")
             except ValueError as e:
-                print(f"Error getting channel entity for {channel_id}: {e}")
+                print(f"Error getting channel entity for {
+                      channel_id}: {str(e)}")
                 return
             except Exception as e:
-                print(f"Unexpected error getting channel entity: {e}")
+                print(f"Unexpected error getting channel entity: {str(e)}")
                 return
 
             messages_processed = 0
             messages = []
-            # Собираем все сообщения сначала
+
             async for message in self.client.iter_messages(channel_entity, limit=limit):
                 if message and message.text:
                     messages.append(message)
 
             print(f"Fetched {len(messages)} messages from channel")
 
-            # Обрабатываем сообщения
             for message in messages:
                 print(f"Processing message {message.id} from {channel_id}")
 
-                # Check if message already exists
                 exists = await self.db_service.vacancy_exists(message.id, channel_id)
                 if exists:
                     print(f"Message {message.id} already exists, skipping...")
                     continue
 
-                # Parse and save new vacancy
                 try:
                     vacancy = await self.message_parser.parse(message, channel_id)
                     if vacancy and await self.db_service.save_vacancy(vacancy):
                         print(f"Vacancy saved: {vacancy.title}")
                         messages_processed += 1
                 except Exception as e:
-                    print(f"Error processing message {message.id}: {e}")
+                    print(f"Error processing message {message.id}: {str(e)}")
                     continue
 
             print(f"Processed {
                   messages_processed} new messages from {channel_id}")
 
         except Exception as e:
-            print(f"Error fetching messages from {channel_id}: {e}")
+            print(f"Error fetching messages from {channel_id}: {str(e)}")
 
 
-# Factory function to create TelegramParser instance
 def create_telegram_parser(settings) -> TelegramParser:
     """Create and configure TelegramParser instance"""
     config = TelegramConfig(
