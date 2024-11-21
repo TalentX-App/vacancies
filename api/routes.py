@@ -22,9 +22,7 @@ async def get_parser() -> VacancyParser:
     return parser
 
 
-@router.get("/")
-async def root():
-    return {"message": "API is running"}
+
 
 
 @router.post("/parse-latest/{channel_id}")

@@ -41,9 +41,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Job Vacancies API", lifespan=lifespan)
 
+
+@app.get("/")
+async def root():
+    return {"message": "API is running"}
+
+
 # Add Prometheus metrics
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
+
 
 app.add_middleware(
     CORSMiddleware,
