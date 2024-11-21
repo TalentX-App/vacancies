@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     monitor_task.cancel()
     await db.close_database_connection()
 
-app = FastAPI(title="Job Vacancies API", lifespan=lifespan)
+app = FastAPI(title="TalentX Vacancies API", lifespan=lifespan)
 
 
 @app.get("/")
