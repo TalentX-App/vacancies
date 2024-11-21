@@ -7,3 +7,4 @@ pydantic
 python-multipart
 pydantic_settings
 anthropic
+telethon
