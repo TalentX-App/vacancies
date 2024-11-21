@@ -74,7 +74,7 @@ class VacancyParser:
                                 "title": "full job title",
                                 "published_date": "{date.isoformat()}",
                                 "company": "company name if present",
-                                "work_format": "remote/office/hybrid",
+                                "work_format": "Віддаленно/Офіс/Гібрид",
                                 "salary": {{
                                     "amount": "amount range or single value or 'Не указано'",
                                     "currency": "UAH/USD/EUR or null",
