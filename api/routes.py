@@ -22,9 +22,6 @@ async def get_parser() -> VacancyParser:
     return parser
 
 
-
-
-
 @router.post("/parse-latest/{channel_id}")
 async def parse_latest_vacancy(
     channel_id: str,
@@ -113,8 +110,19 @@ async def get_vacancies(
 
     vacancies = []
     async for doc in cursor:
+        # Convert salary range values to strings if they are integers
+        if isinstance(doc.get("salary", {}).get("range", {}).get("min"), int):
+            doc["salary"]["range"]["min"] = str(
+                doc["salary"]["range"].get("min"))
+        if isinstance(doc.get("salary", {}).get("range", {}).get("max"), int):
+            doc["salary"]["range"]["max"] = str(
+                doc["salary"]["range"].get("max"))
+
         doc["id"] = str(doc["_id"])
         del doc["_id"]
-        vacancies.append(VacancyResponse(**doc))
+        try:
+            vacancies.append(VacancyResponse(**doc))
+        except Exception as e:
+            print(f"Error creating VacancyResponse: {e}")
 
     return VacancyList(vacancies=vacancies, total=total)
