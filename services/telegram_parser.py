@@ -232,7 +232,7 @@ class TelegramParser:
 
                 print("Fetching messages from channel: " + str(channel))
                 try:
-                    await self.fetch_and_save_messages(channel, limit=50)
+                    await self.fetch_and_save_messages(channel, limit=5)
                     total_processed += 1
                 except Exception as e:
                     print("Error processing channel " +
