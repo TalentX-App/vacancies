@@ -173,8 +173,7 @@ class VacancyMessageParser(MessageParser):
         try:
             parsed_data = await self.ai_parser.parse_text(message.text)
             if not parsed_data or not parsed_data.get('title'):
-                print(f"Failed to parse vacancy data from message {
-                      message.id}")
+                print(f"Failed to parse {message.id}")
                 return None
 
             # Create Location object
