@@ -92,7 +92,7 @@ class VacancyParser:
                             }}
 
                             For contacts field, pay special attention to:
-                            - Telegram usernames starting with @ (e.g. @username)
+                            - Telegram usernames starting with @ (e.g. username)
                             - Phone numbers in any format
                             - Links (https:// or http://)
                             - Email addresses
