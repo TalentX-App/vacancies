@@ -9,3 +9,4 @@ pydantic_settings
 anthropic
 telethon
 prometheus_client
+tenacity
