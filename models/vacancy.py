@@ -5,9 +5,11 @@ from pydantic import BaseModel, Field
 
 
 class SalaryInfo(BaseModel):
-    amount: str
+    amount: Optional[str] = None  # Зарплата может отсутствовать
     currency: Optional[str] = None
-    range: Optional[Dict[str, Optional[str]]] = None
+    range: Optional[Dict[str, Optional[int]]] = Field(
+        # Диапазон с целыми числами
+        default_factory=lambda: {"min": 0, "max": 0})
 
 
 class ContactInfo(BaseModel):
@@ -19,9 +21,10 @@ class VacancyBase(BaseModel):
     title: str
     published_date: datetime
     work_format: str
-    salary: SalaryInfo
+    salary: Optional[SalaryInfo] = None  # Поле зарплаты может быть None
     location: str
-    company: str = Field(default="Не указано")
+    # Подставляем "Не указана", если компания равна null
+    company: Optional[str] = Field(default="Не указана")
     description: str
     contacts: ContactInfo
     raw_text: str

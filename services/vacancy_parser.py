@@ -79,8 +79,8 @@ class VacancyParser:
                                     "amount": "amount range or single value or 'Не указано'",
                                     "currency": "UAH/USD/EUR or null",
                                     "range": {{
-                                        "min": "minimum value or null",
-                                        "max": "maximum value or null"
+                                        "min": "minimum value or 0",
+                                        "max": "maximum value or 0"
                                     }}
                                 }},
                                 "location": "work location or 'Не указано'",
@@ -124,13 +124,34 @@ class VacancyParser:
             if not parsed:
                 return None
 
+            # Обработка зарплаты:
+            salary = parsed.get('salary', {})
+            salary_range = salary.get('range', {'min': 0, 'max': 0})
+
+            # Если min или max диапазона отсутствуют, заменяем на 0
+            min_salary = salary_range.get('min', 0)
+            max_salary = salary_range.get('max', 0)
+
+            # Обеспечиваем, чтобы min и max были целыми числами
+            if min_salary is None:
+                min_salary = 0
+            if max_salary is None:
+                max_salary = 0
+
+            # Обработка компании: если её нет, подставляем "Не указано"
+            company = parsed.get('company', 'Не указано')
+
             return VacancyData(
                 title=parsed['title'],
                 published_date=message.date,
                 work_format=parsed['work_format'],
-                salary=parsed['salary'],
+                salary={
+                    "amount": salary.get("amount", "Не указано"),
+                    "currency": salary.get("currency", None),
+                    "range": {"min": min_salary, "max": max_salary}
+                },
                 location=parsed['location'],
-                company=parsed.get('company', 'Не указано'),
+                company=company,
                 description=parsed['description'],
                 contacts=parsed['contacts'],
                 raw_text=message.text
