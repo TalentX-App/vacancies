@@ -99,7 +99,6 @@ class ChannelMonitor:
     async def monitor_channel(self, channel_id: str):
         try:
             messages = await self.parser.get_channel_messages(channel_id)
-
             if not messages:
                 return
 
@@ -115,13 +114,13 @@ class ChannelMonitor:
 
         except Exception as e:
             self.logger.error(
-                "Channel monitoring error %s: %s", channel_id, str(e))
+                "Channel monitoring error for %s: %s", channel_id, str(e))
             self.parse_errors.inc()
 
     async def start_monitoring(self, channels: list):
         self.monitor_status.set(1)
-        self.logger.info(
-            "Starting monitoring for channels: %s", ", ".join(channels))
+        self.logger.info("Starting monitoring for channels: %s",
+                         ", ".join(channels))
 
         try:
             while True:
