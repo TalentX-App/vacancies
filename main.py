@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router as api_router
 from config import get_settings
 from database.mongodb import db
+from services.monitor import TelegramMonitor
 from services.vacancy_parser import VacancyParser
 
 settings = get_settings()
@@ -17,17 +18,23 @@ async def lifespan(app: FastAPI):
     # Startup
     await db.connect_to_database()
 
-    # Initialize parser
+    # Initialize parser and monitor
     parser = VacancyParser(api_key=settings.anthropic_api_key)
+    monitor = TelegramMonitor(parser)
+
+    # Start monitoring task
+    monitor_task = asyncio.create_task(monitor.start())
 
     yield
 
     # Shutdown
+    await monitor.stop()
+    await monitor_task
     await db.close_database_connection()
 
 app = FastAPI(
     title="Job Vacancies API",
-    description="API for parsing and serving job vacancies",
+    description="API for parsing and monitoring job vacancies",
     version="2.0",
     lifespan=lifespan
 )

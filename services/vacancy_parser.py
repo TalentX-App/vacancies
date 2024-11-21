@@ -16,8 +16,9 @@ class VacancyData:
     work_format: str
     salary: Dict
     location: str
-    company: Optional[str]
+    company: str
     description: str
+    contacts: str
     raw_text: str
 
 
@@ -72,7 +73,7 @@ class VacancyParser:
                             {{
                                 "title": "full job title",
                                 "published_date": "{date.isoformat()}",
-                                "company": "company name if present or null",
+                                "company": "company name if present",
                                 "work_format": "remote/office/hybrid",
                                 "salary": {{
                                     "amount": "amount range or single value or 'Не указано'",
@@ -83,13 +84,23 @@ class VacancyParser:
                                     }}
                                 }},
                                 "location": "work location or 'Не указано'",
-                                "description": "brief job description (max 300 chars)"
+                                "description": "brief description of responsibilities (max 300 chars)",
+                                "contacts": {{
+                                    "type": "telegram_username/phone/link/email",
+                                    "value": "actual contact value"
+                                }}
                             }}
+
+                            For contacts field, pay special attention to:
+                            - Telegram usernames starting with @ (e.g. @username)
+                            - Phone numbers in any format
+                            - Links (https:// or http://)
+                            - Email addresses
 
                             Text:
                             {text}
 
-                            Return ONLY valid JSON."""
+                            Return ONLY valid JSON without any comments."""
                         }]
                     }
                 )
@@ -119,8 +130,9 @@ class VacancyParser:
                 work_format=parsed['work_format'],
                 salary=parsed['salary'],
                 location=parsed['location'],
-                company=parsed.get('company'),
+                company=parsed.get('company', 'Не указано'),
                 description=parsed['description'],
+                contacts=parsed['contacts'],
                 raw_text=message.text
             )
 
@@ -137,5 +149,6 @@ class VacancyParser:
             "location": data.location,
             "company": data.company,
             "description": data.description,
+            "contacts": data.contacts,
             "raw_text": data.raw_text
         }
