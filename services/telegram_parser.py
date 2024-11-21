@@ -260,8 +260,7 @@ class TelegramParser:
                 # Rate limiting delay between channels
                 await asyncio.sleep(5)
 
-            print(f"Completed parsing cycle. Processed {
-                  total_processed} channels.")
+            print(f"Completed  {total_processed} channels.")
             # Wait before next round (5 minutes)
             await asyncio.sleep(300)
 
