@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.schemas import VacancyList, VacancyResponse
@@ -78,32 +79,52 @@ async def parse_latest_vacancy(
         await parser.close_telegram()
 
 
-@router.get("/vacancies/", response_model=VacancyList)
+@router.get("/vacancies", response_model=VacancyList)
 async def get_vacancies(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
-    search: Optional[str] = None,
-    work_format: Optional[str] = None,
-    location: Optional[str] = None,
+    company: Optional[str] = None,
+    specialization: Optional[str] = None,
+    salary_min: Optional[int] = None,
+    salary_max: Optional[int] = None,
     sort_by: str = Query("published_date", enum=["published_date", "title"]),
     sort_order: int = Query(-1, ge=-1, le=1)
 ):
     query = {}
 
-    # Apply search filter
-    if search:
+    # Поиск по компании
+    if company:
+        query["company"] = {"$regex": company, "$options": "i"}
+
+    # Поиск по специализации
+    if specialization:
         query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}}
+            {"title": {"$regex": specialization, "$options": "i"}},
+            {"description": {"$regex": specialization, "$options": "i"}}
         ]
 
-    # Filter by work format
-    if work_format:
-        query["work_format"] = {"$regex": work_format, "$options": "i"}
+    # Фильтрация по зарплате
+    if salary_min or salary_max:
+        salary_query = {"salary.range": {"$exists": True}}
 
-    # Filter by location
-    if location:
-        query["location"] = {"$regex": location, "$options": "i"}
+        if salary_min and salary_max:
+            # Оба значения указаны - ищем пересечение диапазонов
+            salary_query["$and"] = [
+                # минимум вакансии должен быть меньше или равен максимуму фильтра
+                {"salary.range.min": {"$lte": int(salary_max)}},
+                # максимум вакансии должен быть больше или равен минимуму фильтра
+                {"salary.range.max": {"$gte": int(salary_min)}}
+            ]
+        elif salary_min:
+            # Только минимум
+            salary_query["salary.range.min"] = {"$lte": int(salary_min)}
+        elif salary_max:
+            # Только максимум
+            salary_query["salary.range.max"] = {"$gte": int(salary_max)}
+
+        query.update(salary_query)
+
+    print("MongoDB Query:", query)  # Отладочный лог
 
     # Get total count of documents matching query
     total = await db.db.vacancies.count_documents(query)
@@ -116,14 +137,6 @@ async def get_vacancies(
 
     vacancies = []
     async for doc in cursor:
-        # Convert salary range values to strings if they are integers
-        if isinstance(doc.get("salary", {}).get("range", {}).get("min"), int):
-            doc["salary"]["range"]["min"] = str(
-                doc["salary"]["range"].get("min"))
-        if isinstance(doc.get("salary", {}).get("range", {}).get("max"), int):
-            doc["salary"]["range"]["max"] = str(
-                doc["salary"]["range"].get("max"))
-
         # Convert MongoDB ObjectId to string for the response
         doc["id"] = str(doc["_id"])
         del doc["_id"]
@@ -135,3 +148,54 @@ async def get_vacancies(
             print(f"Error creating VacancyResponse: {e}")
 
     return VacancyList(vacancies=vacancies, total=total)
+
+
+# Добавляем новый эндпоинт в существующий роутер
+@router.get("/vacancies/{vacancy_id}", response_model=VacancyResponse)
+async def get_vacancy_by_id(vacancy_id: str):
+    try:
+        # Проверяем, является ли id валидным ObjectId
+        if not ObjectId.is_valid(vacancy_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid vacancy ID format"
+            )
+
+        # Ищем вакансию в базе данных
+        vacancy = await db.db.vacancies.find_one({"_id": ObjectId(vacancy_id)})
+
+        if not vacancy:
+            raise HTTPException(
+                status_code=404,
+                detail="Vacancy not found"
+            )
+
+        # Конвертируем salary range значения в строки, если они целые числа
+        if isinstance(vacancy.get("salary", {}).get("range", {}).get("min"), int):
+            vacancy["salary"]["range"]["min"] = str(
+                vacancy["salary"]["range"].get("min")
+            )
+        if isinstance(vacancy.get("salary", {}).get("range", {}).get("max"), int):
+            vacancy["salary"]["range"]["max"] = str(
+                vacancy["salary"]["range"].get("max")
+            )
+
+        # Преобразуем MongoDB ObjectId в строку
+        vacancy["id"] = str(vacancy["_id"])
+        del vacancy["_id"]
+
+        try:
+            return VacancyResponse(**vacancy)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error creating vacancy response: {str(e)}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
