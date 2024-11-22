@@ -1,12 +1,7 @@
 fastapi
 uvicorn
 python-dotenv
-aiogram
 motor
 pydantic
 python-multipart
 pydantic_settings
-anthropic
-telethon
-prometheus_client
-tenacity

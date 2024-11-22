@@ -9,7 +9,6 @@ from prometheus_client import make_asgi_app
 from api.routes import router as api_router
 from config import get_settings
 from database.mongodb import db
-from services.vacancy_parser import VacancyParser
 
 # Настройка логирования
 logging.basicConfig(
@@ -33,12 +32,6 @@ async def lifespan(app: FastAPI):
 
         # Инициализируем парсер
         logger.info("Initializing VacancyParser")
-        parser = VacancyParser(api_key=settings.anthropic_api_key)
-        await parser.init_telegram(
-            settings.telegram_session,
-            settings.telegram_api_id,
-            settings.telegram_api_hash
-        )
 
         yield
 

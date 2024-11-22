@@ -4,79 +4,12 @@ from typing import List, Optional
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.schemas import VacancyList, VacancyResponse
+from database.models.schemas import VacancyList, VacancyResponse
 from config import get_settings
 from database.mongodb import db
-from services.vacancy_parser import VacancyParser
 
 settings = get_settings()
 router = APIRouter()
-
-
-async def get_parser() -> VacancyParser:
-    parser = VacancyParser(api_key=settings.anthropic_api_key)
-    await parser.init_telegram(
-        settings.telegram_session,
-        settings.telegram_api_id,
-        settings.telegram_api_hash
-    )
-    return parser
-
-
-@router.post("/parse-latest/{channel_id}")
-async def parse_latest_vacancy(
-    channel_id: str,
-    parser: VacancyParser = Depends(get_parser)
-):
-    try:
-        # Get latest message
-        messages = await parser.get_channel_messages(channel_id, limit=1)
-        if not messages:
-            raise HTTPException(status_code=404, detail="No messages found")
-
-        message = messages[0]
-
-        # Check if already exists
-        existing = await db.db.vacancies.find_one({
-            "telegram_message_id": message.id,
-            "channel_id": channel_id
-        })
-
-        if existing:
-            return {
-                "status": "skipped",
-                "message": "Vacancy already exists",
-                "vacancy_id": str(existing["_id"])
-            }
-
-        # Parse vacancy
-        vacancy_data = await parser.parse_vacancy(message)
-        if not vacancy_data:
-            raise HTTPException(
-                status_code=400, detail="Failed to parse vacancy")
-
-        # Prepare for database
-        vacancy_dict = parser.to_dict(vacancy_data)
-        vacancy_dict.update({
-            "telegram_message_id": message.id,
-            "channel_id": channel_id,
-            "parsed_at": datetime.utcnow()
-        })
-
-        # Save to database
-        result = await db.db.vacancies.insert_one(vacancy_dict)
-
-        return {
-            "status": "success",
-            "message": "Vacancy parsed successfully",
-            "vacancy_id": str(result.inserted_id),
-            "preview": message.text[:100] + "..."
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        await parser.close_telegram()
 
 
 @router.get("/vacancies", response_model=VacancyList)

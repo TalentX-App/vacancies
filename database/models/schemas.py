@@ -5,11 +5,13 @@ from pydantic import BaseModel, Field
 
 
 class SalaryInfo(BaseModel):
-    amount: Optional[str] = None  # Зарплата может отсутствовать
+    # Зарплата может отсутствовать
+    amount: Optional[str] = Field(default="Не вказано")
     currency: Optional[str] = None
-    range: Optional[Dict[str, Optional[int]]] = Field(
+    range: Dict[str, Optional[int]] = Field(
         # Диапазон с целыми числами
-        default_factory=lambda: {"min": 0, "max": 0})
+        default_factory=lambda: {"min": 0, "max": 0}
+    )
 
 
 class ContactInfo(BaseModel):
@@ -21,18 +23,15 @@ class VacancyBase(BaseModel):
     title: str
     published_date: datetime
     work_format: str
-    salary: Optional[SalaryInfo] = None  # Поле зарплаты может быть None
+    salary: Optional[SalaryInfo]
     location: str
     # Подставляем "Не указана", если компания равна null
     company: Optional[str] = Field(default="Не указана")
     description: str
     contacts: ContactInfo
-    raw_text: str
 
 
 class VacancyDB(VacancyBase):
-    telegram_message_id: int
-    channel_id: str
     parsed_at: datetime
 
 
