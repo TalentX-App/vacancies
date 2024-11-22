@@ -48,7 +48,7 @@ class VacancyParser:
 
     async def get_channel_messages(self, channel_id: str, limit: int = 1) -> List[Message]:
         try:
-            self.logger.info(f"Fetching messages from channel {channel_id}")
+            self.logger.info("Fetching messages from channel %s", channel_id)
             if channel_id.startswith('-100'):
                 channel_id = int(channel_id)
             else:
@@ -58,17 +58,17 @@ class VacancyParser:
             messages = []
             async for message in self.client.iter_messages(channel, limit=limit):
                 if message.text:  # Логируем только если есть текст
-                    self.logger.debug(f"\nReceived message {message.id} from channel {
-                                      channel_id}:\n{message.text[:500]}...")
+                    self.logger.debug("Received message %s from channel %s:\n%s...",
+                                      message.id, channel_id, message.text[:500])
                 messages.append(message)
 
-            self.logger.info(
-                f"Retrieved {len(messages)} messages from channel {channel_id}")
+            self.logger.info("Retrieved %d messages from channel %s",
+                             len(messages), channel_id)
             return messages
 
         except Exception as e:
-            self.logger.error(f"Error getting messages from channel {
-                              channel_id}: {e}")
+            self.logger.error("Error getting messages from channel %s: %s",
+                              channel_id, str(e))
             raise
 
     def is_valid_message(self, message: Message) -> Tuple[bool, str]:
@@ -78,20 +78,20 @@ class VacancyParser:
         msg_id = getattr(message, 'id', 'unknown')
 
         # Выводим текст сообщения для отладки
-        self.logger.debug(f"\nProcessing message {
-                          msg_id} with text:\n{message.text}\n")
+        self.logger.debug("\nProcessing message %s with text:\n%s\n",
+                          msg_id, message.text[:200])
 
         if not message.text:
-            self.logger.info(f"Message {msg_id} skipped: No text content")
+            self.logger.info("Message %s skipped: No text content", msg_id)
             return False, "Message contains no text"
 
         if message.media and not message.text:
-            self.logger.info(f"Message {msg_id} skipped: Contains only media")
+            self.logger.info("Message %s skipped: Contains only media", msg_id)
             return False, "Message contains only media"
 
         if len(message.text) < 30:
-            self.logger.info(f"Message {msg_id} skipped: Too short ({
-                             len(message.text)} chars)")
+            self.logger.info("Message %s skipped: Too short (%d chars)",
+                             msg_id, len(message.text))
             return False, "Message is too short"
 
         # Основные ключевые слова для вакансии
@@ -166,9 +166,9 @@ class VacancyParser:
 
         if len(found_section_keywords) < 2:
             self.logger.info(
-                f"Message {msg_id} skipped: Not enough section keywords found "
-                f"(found {len(found_section_keywords)}): {
-                    ', '.join(found_section_keywords)}"
+                "Message %s skipped: Not enough section keywords found (found %d): %s",
+                msg_id, len(found_section_keywords), ', '.join(
+                    found_section_keywords)
             )
             return False, "Not enough vacancy section keywords"
 
@@ -183,13 +183,14 @@ class VacancyParser:
             kw for kw in remote_keywords if kw.lower() in text_lower}
 
         self.logger.info(
-            f"Message {msg_id} validated successfully:\n"
-            f"Main keywords ({len(found_main_keywords)}): {
-                ', '.join(found_main_keywords)}\n"
-            f"Section keywords ({len(found_section_keywords)}): {
-                ', '.join(found_section_keywords)}\n"
-            f"Remote keywords ({len(found_remote_keywords)}): {
-                ', '.join(found_remote_keywords)}"
+            "Message %s validated successfully:"
+            "\nMain keywords (%d): %s"
+            "\nSection keywords (%d): %s"
+            "\nRemote keywords (%d): %s",
+            msg_id,
+            len(found_main_keywords), ', '.join(found_main_keywords),
+            len(found_section_keywords), ', '.join(found_section_keywords),
+            len(found_remote_keywords), ', '.join(found_remote_keywords)
         )
         return True, "Valid message"
 
@@ -251,16 +252,16 @@ class VacancyParser:
                 )
 
                 if response.status_code != 200:
-                    self.logger.error(f"Claude API error: {
-                                      response.status_code}")
-                    raise Exception(f"API error: {response.status_code}")
+                    self.logger.error("Claude API error: %d",
+                                      response.status_code)
+                    raise Exception("API error: %d" % response.status_code)
 
                 data = response.json()
                 result = json.loads(data['content'][0]['text'])
 
                 if result:
-                    self.logger.info(f"Claude successfully parsed the vacancy: {
-                                     result.get('title', 'No title')}")
+                    self.logger.info("Claude successfully parsed the vacancy: %s",
+                                     result.get('title', 'No title'))
                 else:
                     self.logger.info(
                         "Claude returned null (not a remote vacancy or unclear format)")
@@ -268,30 +269,31 @@ class VacancyParser:
                 return result
 
         except Exception as e:
-            self.logger.error(f"Claude API error: {e}")
+            self.logger.error("Claude API error: %s", str(e))
             return None
 
     async def parse_vacancy(self, message: Message) -> Optional[VacancyData]:
         msg_id = getattr(message, 'id', 'unknown')
-        self.logger.info(f"Starting to parse message {msg_id}")
+        self.logger.info("Starting to parse message %s", msg_id)
 
         # Проверяем валидность сообщения
         is_valid, reason = self.is_valid_message(message)
         if not is_valid:
-            self.logger.info(f"Message {msg_id} validation failed: {reason}")
+            self.logger.info(
+                "Message %s validation failed: %s", msg_id, reason)
             return None
 
         try:
             parsed = await self.parse_with_claude(message.text, message.date)
             if not parsed:
                 self.logger.info(
-                    f"Message {msg_id}: Failed to parse with Claude")
+                    "Message %s: Failed to parse with Claude", msg_id)
                 return None
 
             # Проверяем, что это удаленная вакансия
             if parsed.get('work_format') != 'Віддаленно':
-                self.logger.info(f"Message {msg_id} skipped: Not a remote vacancy "
-                                 f"(format: {parsed.get('work_format')})")
+                self.logger.info("Message %s skipped: Not a remote vacancy (format: %s)",
+                                 msg_id, parsed.get('work_format'))
                 return None
 
             # Обработка зарплаты
@@ -321,12 +323,12 @@ class VacancyParser:
                 raw_text=message.text
             )
 
-            self.logger.info(f"Successfully parsed vacancy from message {
-                             msg_id}: {vacancy_data.title}")
+            self.logger.info("Successfully parsed vacancy from message %s: %s",
+                             msg_id, vacancy_data.title)
             return vacancy_data
 
         except Exception as e:
-            self.logger.error(f"Error parsing message {msg_id}: {str(e)}")
+            self.logger.error("Error parsing message %s: %s", msg_id, str(e))
             return None
 
     def to_dict(self, data: VacancyData) -> dict:
@@ -341,6 +343,6 @@ class VacancyParser:
             "contacts": data.contacts,
             "raw_text": data.raw_text
         }
-        self.logger.debug(f"Converted VacancyData to dict: {
-                          json.dumps(result, default=str)}")
+        self.logger.debug("Converted VacancyData to dict: %s",
+                          json.dumps(result, default=str))
         return result
