@@ -1,11 +1,11 @@
-from datetime import datetime
-from typing import List, Optional
+
+from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
-from database.models.schemas import VacancyList, VacancyResponse
 from config import get_settings
+from database.models.schemas import VacancyList, VacancyResponse
 from database.mongodb import db
 
 settings = get_settings()
