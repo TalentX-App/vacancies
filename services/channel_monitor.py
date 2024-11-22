@@ -13,7 +13,6 @@ class ChannelMonitor:
         self.db = db
         self.parser = parser
         self.logger = logging.getLogger(__name__)
-        # Устанавливаем уровень логирования
         self.logger.setLevel(logging.INFO)
         self.states = self.db['channel_states']
         self.vacancies = self.db['vacancies']
@@ -21,47 +20,10 @@ class ChannelMonitor:
         asyncio.create_task(self._init_collections())
         self._setup_metrics()
 
-    def _setup_metrics(self):
-        # Общие метрики
-        self.messages_processed = Counter(
-            'messages_processed_total', 'Number of messages processed')
-        self.parse_errors = Counter(
-            'parse_errors_total', 'Number of parsing errors')
-        self.parsing_time = Histogram(
-            'message_parsing_seconds', 'Time spent parsing messages')
-        self.monitor_status = Gauge(
-            'telegram_monitor_status', 'Monitor running status')
-        self.last_success = Gauge(
-            'last_successful_parse_time', 'Last successful parse timestamp')
-
-        # Метрики для каналов
-        self.channel_messages = Counter(
-            'channel_messages_processed_total',
-            'Number of messages processed for channel',
-            ['channel_id']
-        )
-        self.channel_errors = Counter(
-            'channel_parse_errors_total',
-            'Number of parsing errors for channel',
-            ['channel_id']
-        )
-        self.channel_last_success = Gauge(
-            'channel_last_successful_parse_time',
-            'Last successful parse timestamp for channel',
-            ['channel_id']
-        )
-        self.channel_status = Gauge(
-            'channel_active',
-            'Channel monitoring status',
-            ['channel_id']
-        )
-
-        self.monitor_status.set(0)
-
     def _init_channel_metrics(self, channel_id: str):
         """Инициализация метрик для канала."""
         if channel_id not in self.channel_metrics:
-            self.logger.info(f"Initializing metrics for channel {channel_id}")
+            self.logger.info("Initializing metrics for channel %s", channel_id)
             self.channel_metrics[channel_id] = {
                 'messages_processed': self.channel_messages.labels(channel_id=channel_id),
                 'parse_errors': self.channel_errors.labels(channel_id=channel_id),
@@ -69,32 +31,11 @@ class ChannelMonitor:
                 'active': self.channel_status.labels(channel_id=channel_id)
             }
 
-    def _validate_channel_id(self, channel_id: str) -> str:
-        """Валидация и нормализация ID канала."""
-        channel_id = channel_id.strip()
-        if not channel_id:
-            raise ValueError("Empty channel ID")
-        return channel_id
-
-    async def _init_collections(self):
-        try:
-            await self.states.create_index([("channel_id", 1)], unique=True)
-            await self.vacancies.create_index([
-                ("telegram_message_id", 1),
-                ("channel_id", 1)
-            ], unique=True)
-            await self.vacancies.create_index([("published_date", -1)])
-            await self.vacancies.create_index([("title", 1)])
-            self.logger.info("MongoDB collections initialized successfully")
-        except Exception as e:
-            self.logger.error("Error initializing collections: %s", str(e))
-            raise
-
     async def get_last_message_id(self, channel_id: str) -> int:
         doc = await self.states.find_one({"channel_id": channel_id})
         last_id = doc["last_message_id"] if doc else 0
-        self.logger.info(f"Last message ID for channel {
-                         channel_id}: {last_id}")
+        self.logger.info("Last message ID for channel %s: %d",
+                         channel_id, last_id)
         return last_id
 
     async def update_last_message_id(self, channel_id: str, message_id: int):
@@ -106,15 +47,15 @@ class ChannelMonitor:
             }},
             upsert=True
         )
-        self.logger.info(f"Updated last message ID for channel {
-                         channel_id} to {message_id}")
+        self.logger.info("Updated last message ID for channel %s to %d",
+                         channel_id, message_id)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def process_message(self, message, channel_id: str):
         try:
             msg_id = getattr(message, 'id', 'unknown')
-            self.logger.info(f"Processing message {
-                             msg_id} from channel {channel_id}")
+            self.logger.info("Processing message %s from channel %s",
+                             msg_id, channel_id)
 
             with self.parsing_time.time():
                 existing = await self.vacancies.find_one({
@@ -123,14 +64,14 @@ class ChannelMonitor:
                 })
 
                 if existing:
-                    self.logger.info(f"Message {msg_id} from channel {
-                                     channel_id} already exists in database")
+                    self.logger.info("Message %s from channel %s already exists in database",
+                                     msg_id, channel_id)
                     return False
 
                 vacancy_data = await self.parser.parse_vacancy(message)
                 if not vacancy_data:
-                    self.logger.info(f"Message {msg_id} from channel {
-                                     channel_id} was not parsed as a vacancy")
+                    self.logger.info("Message %s from channel %s was not parsed as a vacancy",
+                                     msg_id, channel_id)
                     return False
 
                 vacancy_dict = self.parser.to_dict(vacancy_data)
@@ -158,8 +99,8 @@ class ChannelMonitor:
                 return True
 
         except Exception as e:
-            self.logger.error(
-                "Error processing message %s from channel %s: %s", msg_id, channel_id, str(e))
+            self.logger.error("Error processing message %s from channel %s: %s",
+                              msg_id, channel_id, str(e))
             self.parse_errors.inc()
             if channel_id in self.channel_metrics:
                 self.channel_metrics[channel_id]['parse_errors'].inc()
@@ -169,21 +110,22 @@ class ChannelMonitor:
         try:
             channel_id = self._validate_channel_id(channel_id)
             self.logger.info(
-                f"Starting monitoring cycle for channel {channel_id}")
+                "Starting monitoring cycle for channel %s", channel_id)
 
             self._init_channel_metrics(channel_id)
 
             if channel_id in self.channel_metrics:
                 self.channel_metrics[channel_id]['active'].set(1)
-                self.logger.info(f"Channel {channel_id} marked as active")
+                self.logger.info("Channel %s marked as active", channel_id)
 
             messages = await self.parser.get_channel_messages(channel_id)
             if not messages:
-                self.logger.info(f"No messages found for channel {channel_id}")
+                self.logger.info(
+                    "No messages found for channel %s", channel_id)
                 return
 
-            self.logger.info(
-                f"Retrieved {len(messages)} messages from channel {channel_id}")
+            self.logger.info("Retrieved %d messages from channel %s",
+                             len(messages), channel_id)
             processed = 0
             skipped = 0
 
@@ -194,21 +136,22 @@ class ChannelMonitor:
                     skipped += 1
 
             self.logger.info(
-                f"Channel {channel_id} monitoring cycle complete: "
-                f"processed {processed} messages, skipped {skipped} messages")
+                "Channel %s monitoring cycle complete: processed %d messages, skipped %d messages",
+                channel_id, processed, skipped
+            )
 
             if processed:
                 await self.update_last_message_id(channel_id, messages[-1].id)
 
         except Exception as e:
-            self.logger.error(
-                "Channel monitoring error for %s: %s", channel_id, str(e))
+            self.logger.error("Channel monitoring error for %s: %s",
+                              channel_id, str(e))
             self.parse_errors.inc()
             if channel_id in self.channel_metrics:
                 self.channel_metrics[channel_id]['parse_errors'].inc()
                 self.channel_metrics[channel_id]['active'].set(0)
                 self.logger.info(
-                    f"Channel {channel_id} marked as inactive due to error")
+                    "Channel %s marked as inactive due to error", channel_id)
 
     async def start_monitoring(self, channels: List[str]):
         """
@@ -217,8 +160,8 @@ class ChannelMonitor:
         Args:
             channels: Список ID каналов для мониторинга
         """
-        self.logger.info(
-            f"Starting monitoring with provided channels: {channels}")
+        self.logger.info("Starting monitoring with provided channels: %s",
+                         channels)
 
         if not channels:
             self.logger.error("No channels provided for monitoring")
@@ -231,9 +174,10 @@ class ChannelMonitor:
                 valid_channel = self._validate_channel_id(channel)
                 valid_channels.append(valid_channel)
                 self.logger.info(
-                    f"Channel {valid_channel} validated successfully")
+                    "Channel %s validated successfully", valid_channel)
             except ValueError as e:
-                self.logger.error(f"Invalid channel ID: {channel}. Error: {e}")
+                self.logger.error("Invalid channel ID: %s. Error: %s",
+                                  channel, str(e))
                 continue
 
         if not valid_channels:
@@ -262,7 +206,7 @@ class ChannelMonitor:
                 if channel_id in self.channel_metrics:
                     self.channel_metrics[channel_id]['active'].set(0)
                     self.logger.info(
-                        f"Channel {channel_id} marked as inactive")
+                        "Channel %s marked as inactive", channel_id)
         finally:
             self.monitor_status.set(0)
             self.logger.info("Monitoring stopped")
