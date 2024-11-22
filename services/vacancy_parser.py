@@ -150,15 +150,6 @@ class VacancyParser:
             if keyword.lower() in text_lower:
                 found_section_keywords.add(keyword)
 
-        # Логируем найденные ключевые слова
-        self.logger.debug(
-            f"\nFound keywords in message {msg_id}:\n"
-            f"Main keywords ({len(found_main_keywords)}): {
-                ', '.join(found_main_keywords)}\n"
-            f"Section keywords ({len(found_section_keywords)}): {
-                ', '.join(found_section_keywords)}\n"
-        )
-
         if not found_main_keywords:
             self.logger.info(
                 f"Message {msg_id} skipped: No main job keywords found")
