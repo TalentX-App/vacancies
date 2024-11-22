@@ -17,8 +17,61 @@ class ChannelMonitor:
         self.states = self.db['channel_states']
         self.vacancies = self.db['vacancies']
         self.channel_metrics = {}
-        asyncio.create_task(self._init_collections())
+        asyncio.create_task(self.init_collections())
         self._setup_metrics()
+
+    def _setup_metrics(self):
+        # Общие метрики
+        self.messages_processed = Counter(
+            'messages_processed_total', 'Number of messages processed')
+        self.parse_errors = Counter(
+            'parse_errors_total', 'Number of parsing errors')
+        self.parsing_time = Histogram(
+            'message_parsing_seconds', 'Time spent parsing messages')
+        self.monitor_status = Gauge(
+            'telegram_monitor_status', 'Monitor running status')
+        self.last_success = Gauge(
+            'last_successful_parse_time', 'Last successful parse timestamp')
+
+        # Метрики для каналов
+        self.channel_messages = Counter(
+            'channel_messages_processed_total',
+            'Number of messages processed for channel',
+            ['channel_id']
+        )
+        self.channel_errors = Counter(
+            'channel_parse_errors_total',
+            'Number of parsing errors for channel',
+            ['channel_id']
+        )
+        self.channel_last_success = Gauge(
+            'channel_last_successful_parse_time',
+            'Last successful parse timestamp for channel',
+            ['channel_id']
+        )
+        self.channel_status = Gauge(
+            'channel_active',
+            'Channel monitoring status',
+            ['channel_id']
+        )
+
+        self.monitor_status.set(0)
+
+    async def init_collections(self):
+        """Инициализация коллекций MongoDB."""
+        try:
+            self.logger.info("Initializing MongoDB collections")
+            await self.states.create_index([("channel_id", 1)], unique=True)
+            await self.vacancies.create_index([
+                ("telegram_message_id", 1),
+                ("channel_id", 1)
+            ], unique=True)
+            await self.vacancies.create_index([("published_date", -1)])
+            await self.vacancies.create_index([("title", 1)])
+            self.logger.info("MongoDB collections initialized successfully")
+        except Exception as e:
+            self.logger.error("Error initializing collections: %s", str(e))
+            raise
 
     def _init_channel_metrics(self, channel_id: str):
         """Инициализация метрик для канала."""
