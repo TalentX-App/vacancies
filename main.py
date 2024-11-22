@@ -62,10 +62,6 @@ async def root():
     }
 
 
-# Add Prometheus metrics
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
-
 # Добавляем CORS middleware
 app.add_middleware(
     CORSMiddleware,
