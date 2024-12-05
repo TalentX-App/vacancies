@@ -23,6 +23,7 @@ class VacancyBase(BaseModel):
     salary: Optional[SalaryInfo]
     location: str
     company: Optional[str] = Field(default="Не указана")
+    company_logo_url: Optional[str] = None
     description: str
     contacts: ContactInfo
 
